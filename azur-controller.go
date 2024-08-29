@@ -38,6 +38,60 @@ type InverterReply struct {
 
 var retryCount = 3
 
+// Define ErrorFlag as a uint16 to accommodate all bits.
+type ErrorFlag uint16
+
+// Define constants for each error corresponding to their bit position.
+const (
+	TempMaxErr     ErrorFlag = 1 << iota // Bit 0
+	UBatMaxErr                           // Bit 1
+	UBatMinErr                           // Bit 2
+	NetzausfallErr                       // Bit 3
+	UzMaxErr                             // Bit 4
+	UzMinErr                             // Bit 5
+	IBatErr                              // Bit 6
+	// Skip Bit 7
+	_      // Placeholder for bit 7, no error associated
+	NtcErr // Bit 8
+	HWErr_Bit
+	PNetzEffMaxErr
+	// Skip Bits 11, 12
+	_ // Placeholder for bit 11
+	_ // Placeholder for bit 12
+	TotalErr
+	WaitErr
+	// Bit 15 is unused
+)
+
+// ErrorDescriptions maps each error flag to its description.
+var ErrorDescriptions = map[ErrorFlag]string{
+	TempMaxErr:     "TempMaxErr",
+	UBatMaxErr:     "UBatMaxErr",
+	UBatMinErr:     "UBatMinErr",
+	NetzausfallErr: "NetzausfallErr",
+	UzMaxErr:       "UzMaxErr",
+	UzMinErr:       "UzMinErr",
+	IBatErr:        "IBatErr",
+	NtcErr:         "NtcErr",
+	HWErr_Bit:      "HWErr_Bit",
+	PNetzEffMaxErr: "PNetzEffMaxErr",
+	TotalErr:       "TotalErr",
+	WaitErr:        "WaitErr",
+}
+
+// CheckErrors takes an errorState and returns a slice of strings representing the active errors.
+func CheckErrors(errorState ErrorFlag) []string {
+	var errors []string
+	for flag, description := range ErrorDescriptions {
+		if errorState&flag != 0 {
+			errors = append(errors, description)
+			fmt.Println("Error detected:", description)
+		}
+	}
+
+	return errors
+}
+
 func GetModbusRegister(modbusData []byte, register int) uint16 {
 	register += 0
 	return uint16(modbusData[(register*2)+1]) | uint16(modbusData[register*2])<<8

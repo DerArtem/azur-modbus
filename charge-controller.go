@@ -14,8 +14,8 @@ var totalConsumption float32
 var dischargePowerTotal float32 = 0
 
 var batVoltage float32 = 48
-var minSoC float64 = 15
-var maxSoC float64 = 110
+var minSoC float64 = 10
+var maxSoC float64 = 99
 var batSoC float64 = 0
 
 var maxChargeCurrent float32 = 100
@@ -48,6 +48,7 @@ type Inverter struct {
 	SolarPower     float32
 	ChargePower    float32
 	DischargePower float32
+	ErrorState     ErrorFlag
 }
 
 func calcMaxChargePowerBySoc() (maxChargePowerTotal float32) {
@@ -62,13 +63,20 @@ func calcMaxChargePowerBySoc() (maxChargePowerTotal float32) {
 		maxChargePowerTotal = 4000
 	}
 	if batSoC > 80 {
-		maxChargePowerTotal = 2500
+		maxChargePowerTotal = 3500
 	}
 	if batSoC > 85 {
-		maxChargePowerTotal = 2000
+		maxChargePowerTotal = 3000
 	}
 	if batSoC > 90 {
-		maxChargePowerTotal = 1000
+		maxChargePowerTotal = 2500
+	}
+	if batSoC > 95 {
+		maxChargePowerTotal = 1500
+	}
+
+	if batSoC > 98 {
+		maxChargePowerTotal = 500
 	}
 
 	return maxChargePowerTotal
@@ -97,7 +105,6 @@ func calcMaxDischargePowerBySoc() (maxDischargePowerTotal float32) {
 
 func Compute() {
 	var solarPowerTotal float32
-
 	//var minVolt float32 = 44 // 43.2V
 	//var maxVolt float32 = 57 // 58.4V
 
@@ -142,7 +149,7 @@ func Compute() {
 			if solarPowerTotal != 0 {
 				for i := range inverters {
 					proportion := inverters[i].SolarPower / solarPowerTotal
-					chargePower := proportion * surplusPower
+					chargePower := proportion * (surplusPower + inverterGridOutputPower)
 
 					if chargePower > inverters[i].SolarPower {
 						chargePower = inverters[i].SolarPower
@@ -167,7 +174,7 @@ func Compute() {
 	if totalConsumption > solarPowerTotal {
 		// Discharge the battery:
 		fmt.Printf("Power Deficit, discharging battery!\n")
-		dischargePowerTotal = totalConsumption - solarPowerTotal
+		dischargePowerTotal = totalConsumption
 
 		if forceCharging == false {
 			for i := range inverters {

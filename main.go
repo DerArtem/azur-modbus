@@ -9,6 +9,8 @@ import (
 
 var minVolt float32 = 44 // 43.2V
 var maxVolt float32 = 57 // 58.4V
+var minCellVolt float64
+var maxCellVolt float64
 
 func setComParameters(handler *modbus.RTUClientHandler) {
 	handler.BaudRate = 115200
@@ -35,10 +37,10 @@ func main() {
 	var janizzaData JanizzaData
 
 	inverters = []Inverter{
-		{0x80, "Inverter1", 0, 0, 0},
-		{0x81, "Inverter2", 0, 0, 0},
-		{0x82, "Inverter3", 0, 0, 0},
-		{0x83, "Inverter4", 0, 0, 0},
+		{0x80, "Inverter1", 0, 0, 0, 0},
+		{0x81, "Inverter2", 0, 0, 0, 0},
+		{0x82, "Inverter3", 0, 0, 0, 0},
+		{0x83, "Inverter4", 0, 0, 0, 0},
 	}
 
 	//comPort := "COM5"
@@ -83,11 +85,26 @@ func main() {
 	for {
 		fmt.Printf("---\n")
 		UpdateBmsData()
+
 		if BmsData.IsValid == true {
 			batSoC = BmsData.BatterySOC
+
+			// Find max and min cell
+			minCellVolt = BmsData.Cell[0]
+			maxCellVolt = BmsData.Cell[0]
+
+			for _, cellVolt := range BmsData.Cell {
+				if cellVolt <= minCellVolt {
+					minCellVolt = cellVolt
+				}
+
+				if cellVolt >= maxCellVolt {
+					maxCellVolt = cellVolt
+				}
+			}
 		}
 
-		fmt.Printf("BatSoC: %v\n", batSoC)
+		fmt.Printf("BatSoC: %v, min: %vV, max: %vV\n", batSoC, minCellVolt, maxCellVolt)
 
 		// Get Janizza Data
 		handler.SlaveId = 0x01
@@ -129,6 +146,9 @@ func main() {
 
 				inverters[i].SolarPower = invReply.PSolar
 				inverterGridOutputPower += invReply.PGrid
+
+				inverters[i].ErrorState = ErrorFlag(invReply.ErrorState)
+				CheckErrors(inverters[i].ErrorState)
 			}
 		}
 
