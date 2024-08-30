@@ -37,10 +37,10 @@ func main() {
 	var janizzaData JanizzaData
 
 	inverters = []Inverter{
-		{0x80, "Inverter1", 0, 0, 0, 0},
-		{0x81, "Inverter2", 0, 0, 0, 0},
-		{0x82, "Inverter3", 0, 0, 0, 0},
-		{0x83, "Inverter4", 0, 0, 0, 0},
+		{0x80, "Inverter1", 0, 0, 0},
+		{0x81, "Inverter2", 0, 0, 0},
+		{0x82, "Inverter3", 0, 0, 0},
+		{0x83, "Inverter4", 0, 0, 0},
 	}
 
 	//comPort := "COM5"
@@ -157,20 +157,10 @@ func main() {
 		Compute()
 
 		for _, inverter := range inverters {
-			var inverterBatteryPower float32 = 0
-
 			handler.SlaveId = inverter.ID
 			WriteData(client, inverter.ID, 0x04, 0x1388)
 
-			if inverter.ChargePower > 0 {
-				inverterBatteryPower = inverter.ChargePower
-			}
-
-			if inverter.DischargePower > 0 {
-				inverterBatteryPower = -inverter.DischargePower
-			}
-
-			SetBatteryPower(client, inverter.ID, inverterBatteryPower)
+			SetBatteryPower(client, inverter.ID, inverter.ChargePower)
 
 			WriteData(client, inverter.ID, 0x2C, 0x0000) // Netzleistung???
 			//WriteData(client, id, 0x2F, 0x000A)
@@ -194,7 +184,7 @@ func main() {
 				time.Sleep(100 * time.Millisecond)
 			}
 		*/
-		time.Sleep(1000 * time.Millisecond)
+		time.Sleep(5000 * time.Millisecond)
 	}
 
 	// Shutdown
