@@ -9,8 +9,6 @@ import (
 
 var minVolt float32 = 44 // 43.2V
 var maxVolt float32 = 57 // 58.4V
-var minCellVolt float64
-var maxCellVolt float64
 
 func setComParameters(handler *modbus.RTUClientHandler) {
 	handler.BaudRate = 115200
@@ -86,25 +84,7 @@ func main() {
 		fmt.Printf("---\n")
 		UpdateBmsData()
 
-		if BmsData.IsValid == true {
-			batSoC = BmsData.BatterySOC
-
-			// Find max and min cell
-			minCellVolt = BmsData.Cell[0]
-			maxCellVolt = BmsData.Cell[0]
-
-			for _, cellVolt := range BmsData.Cell {
-				if cellVolt <= minCellVolt {
-					minCellVolt = cellVolt
-				}
-
-				if cellVolt >= maxCellVolt {
-					maxCellVolt = cellVolt
-				}
-			}
-		}
-
-		fmt.Printf("BatSoC: %v, min: %vV, max: %vV\n", batSoC, minCellVolt, maxCellVolt)
+		fmt.Printf("BatSoC: %.2f, min: %.3fV, max: %.3fV diff: %.3fV\n", batSoC, MinCellVolt, MaxCellVolt, MaxCellVolt-MinCellVolt)
 
 		// Get Janizza Data
 		handler.SlaveId = 0x01

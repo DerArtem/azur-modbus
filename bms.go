@@ -6,6 +6,9 @@ import (
 	"time"
 )
 
+var MinCellVolt float64
+var MaxCellVolt float64
+
 type State int64
 
 const (
@@ -251,5 +254,27 @@ func UpdateBmsData() {
 		//fmt.Printf("\n SOC: %v\n", BmsData.BatterySOC)
 	} else {
 		fmt.Printf("BMS communication error: %v\n", err)
+	}
+
+	GetMinMaxBSMVolts()
+}
+
+func GetMinMaxBSMVolts() {
+	if BmsData.IsValid == true {
+		batSoC = BmsData.BatterySOC
+
+		// Find max and min cell
+		MinCellVolt = BmsData.Cell[0]
+		MaxCellVolt = BmsData.Cell[0]
+
+		for _, cellVolt := range BmsData.Cell {
+			if cellVolt <= MinCellVolt {
+				MinCellVolt = cellVolt
+			}
+
+			if cellVolt >= MaxCellVolt {
+				MaxCellVolt = cellVolt
+			}
+		}
 	}
 }

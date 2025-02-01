@@ -5,7 +5,8 @@ import (
 	"fmt"
 )
 
-var forceCharging = false
+var ForceCharging = false
+var ForceChargingByVolt = false
 
 var gridConsumption float32 = 0
 var inverterGridOutputPower float32 = 0
@@ -14,7 +15,7 @@ var totalConsumption float32
 var dischargePowerTotal float32 = 0
 
 var batVoltage float32 = 48
-var minSoC float64 = 10
+var minSoC float64 = 40
 var maxSoC float64 = 99
 var batSoC float64 = 0
 
@@ -133,9 +134,20 @@ func Compute() {
 	fmt.Printf("currentChargePower: %v\n", currentChargePower)
 	fmt.Printf("requiredPower: %v\n", requiredPower)
 
-	if forceCharging {
+	if MinCellVolt < 3.0 && MaxCellVolt < 3.2 {
+		ForceChargingByVolt = true
+	} else {
+		ForceChargingByVolt = false
+	}
+
+	if ForceCharging == true {
 		fmt.Printf("ForceCharging is enabled!\n")
-		requiredPower = 10000
+		requiredPower = 8000
+	}
+
+	if ForceChargingByVolt == true {
+		fmt.Printf("ForceChargingByVolt is enabled!\n")
+		requiredPower = 8000
 	}
 
 	if requiredPower > calcMaxChargePowerBySoc() {
@@ -151,7 +163,12 @@ func Compute() {
 	if requiredPower < 0 {
 		fmt.Printf("DISCARGING BATTERY!\n")
 
-		if batSoC < minSoC {
+		if MinCellVolt < 3.10 {
+			fmt.Printf("Min CellVoltage reached, do not discharge!\n")
+			for i := range inverters {
+				inverters[i].ChargePower = 0
+			}
+		} else if batSoC < minSoC {
 			fmt.Printf("Min SoC reached, do not discharge!\n")
 			for i := range inverters {
 				inverters[i].ChargePower = 0
