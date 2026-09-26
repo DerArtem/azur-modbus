@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"log"
 	"math"
 	"net/http"
@@ -30,18 +29,23 @@ var evccControl = struct {
 }
 
 type EVCCStatus struct {
-	SOC              float64  `json:"soc"`
-	BatteryPower     float64  `json:"batteryPower"`
-	BatteryVoltage   float64  `json:"batteryVoltage"`
-	BatteryCurrent   float64  `json:"batteryCurrent"`
-	GridPower        float32  `json:"gridPower"`
-	PVPower          float32  `json:"pvPower"`
-	MinCellVoltage   float64  `json:"minCellVoltage"`
-	MaxCellVoltage   float64  `json:"maxCellVoltage"`
-	Mode             EVCCMode `json:"mode"`
-	BMSValid         bool     `json:"bmsValid"`
-	LastModeCommand  string   `json:"lastModeCommand,omitempty"`
+	SOC             float64  `json:"soc"`
+	BatteryPower    float64  `json:"batteryPower"`
+	BatteryVoltage  float64  `json:"batteryVoltage"`
+	BatteryCurrent  float64  `json:"batteryCurrent"`
+	GridPower       float32  `json:"gridPower"`
+	PVPower         float32  `json:"pvPower"`
+	MinCellVoltage  float64  `json:"minCellVoltage"`
+	MaxCellVoltage  float64  `json:"maxCellVoltage"`
+	Mode            EVCCMode `json:"mode"`
+	BMSValid        bool     `json:"bmsValid"`
+	LastModeCommand string   `json:"lastModeCommand,omitempty"`
 }
+
+var evccStatus = struct {
+	sync.RWMutex
+	value EVCCStatus
+}{}
 
 func init() {
 	addr := os.Getenv("EVCC_HTTP_ADDR")
@@ -90,8 +94,6 @@ func getEVCCMode() (EVCCMode, time.Time) {
 	lastCommand := evccControl.lastCommand
 	evccControl.RUnlock()
 
-	// Fail safe: if evcc stops refreshing a non-normal command, return to
-	// the controller's original self-consumption behaviour.
 	if mode != EVCCModeNormal && !lastCommand.IsZero() && time.Since(lastCommand) > evccWatchdogTimeout {
 		setEVCCMode(EVCCModeNormal)
 		return EVCCModeNormal, time.Now()
@@ -100,24 +102,55 @@ func getEVCCMode() (EVCCMode, time.Time) {
 	return mode, lastCommand
 }
 
-// applyEVCCMode modifies only the requested operating strategy. The existing
-// BMS, SoC and cell-voltage safety limits in Compute() are applied afterwards.
+// applyEVCCMode changes only the requested operating strategy. Compute() applies
+// the existing BMS, SoC and cell-voltage safety limits afterwards.
 func applyEVCCMode(requiredPower float32) float32 {
 	mode, _ := getEVCCMode()
 
 	switch mode {
 	case EVCCModeHold:
-		// Positive is charging in azur-modbus, negative is discharging.
+		// Positive means charging in azur-modbus, negative means discharging.
 		if requiredPower < 0 {
 			return 0
 		}
 	case EVCCModeCharge:
-		// Request maximum charge power. Existing controller limits reduce this
-		// according to SoC and cell voltage.
+		// Request maximum charge power. Existing limits reduce this as needed.
 		return 8000
 	}
 
 	return requiredPower
+}
+
+// updateEVCCStatusSnapshot is called by the controller loop after a complete
+// measurement/control cycle. The HTTP handler only reads this immutable copy.
+func updateEVCCStatusSnapshot() {
+	mode, lastCommand := getEVCCMode()
+
+	pvPower := float32(0)
+	for _, inverter := range inverters {
+		pvPower += inverter.SolarPower
+	}
+
+	status := EVCCStatus{
+		SOC:            batSoC,
+		BatteryPower:   evccBatteryPower(),
+		BatteryVoltage: BmsData.BatteryVolts,
+		BatteryCurrent: BmsData.BatteryAmps,
+		GridPower:      gridConsumption,
+		PVPower:        pvPower,
+		MinCellVoltage: MinCellVolt,
+		MaxCellVoltage: MaxCellVolt,
+		Mode:           mode,
+		BMSValid:       BmsData.IsValid,
+	}
+
+	if !lastCommand.IsZero() {
+		status.LastModeCommand = lastCommand.Format(time.RFC3339)
+	}
+
+	evccStatus.Lock()
+	evccStatus.value = status
+	evccStatus.Unlock()
 }
 
 func handleEVCCStatus(w http.ResponseWriter, r *http.Request) {
@@ -127,29 +160,9 @@ func handleEVCCStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mode, lastCommand := getEVCCMode()
-
-	pvPower := float32(0)
-	for _, inverter := range inverters {
-		pvPower += inverter.SolarPower
-	}
-
-	status := EVCCStatus{
-		SOC:             batSoC,
-		BatteryPower:    evccBatteryPower(),
-		BatteryVoltage:  BmsData.BatteryVolts,
-		BatteryCurrent:  BmsData.BatteryAmps,
-		GridPower:       gridConsumption,
-		PVPower:         pvPower,
-		MinCellVoltage:  MinCellVolt,
-		MaxCellVoltage:  MaxCellVolt,
-		Mode:            mode,
-		BMSValid:        BmsData.IsValid,
-	}
-
-	if !lastCommand.IsZero() {
-		status.LastModeCommand = lastCommand.Format(time.RFC3339)
-	}
+	evccStatus.RLock()
+	status := evccStatus.value
+	evccStatus.RUnlock()
 
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(status); err != nil {
@@ -158,7 +171,7 @@ func handleEVCCStatus(w http.ResponseWriter, r *http.Request) {
 }
 
 // evcc uses positive battery power for discharge and negative power for charge.
-// The BMS state is used for the sign because the raw current representation is
+// The BMS state determines the sign because the raw current representation is
 // device-specific.
 func evccBatteryPower() float64 {
 	if !BmsData.IsValid {
@@ -178,8 +191,4 @@ func evccBatteryPower() float64 {
 		log.Printf("unknown BMS state %v, reporting 0 W to evcc", BmsData.State)
 		return 0
 	}
-}
-
-func (m EVCCMode) GoString() string {
-	return fmt.Sprintf("%q", string(m))
 }
