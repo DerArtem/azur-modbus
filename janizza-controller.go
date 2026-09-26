@@ -41,10 +41,10 @@ func JanizzaGetRealPower(client modbus.Client, janizzaData *JanizzaData) error {
 	l3Temp := binary.BigEndian.Uint32(results[8:12])
 	SumTemp := binary.BigEndian.Uint32(results[12:16])
 
-	janizzaData.PL1 = math.Float32frombits(l1Temp) * transformerRatio
-	janizzaData.PL2 = math.Float32frombits(l2Temp) * transformerRatio
-	janizzaData.PL3 = math.Float32frombits(l3Temp) * transformerRatio
-	janizzaData.PSum = math.Float32frombits(SumTemp) * transformerRatio
+	janizzaData.PL1 = (math.Float32frombits(l1Temp) * transformerRatio) + 40
+	janizzaData.PL2 = (math.Float32frombits(l2Temp) * transformerRatio) + 40
+	janizzaData.PL3 = (math.Float32frombits(l3Temp) * transformerRatio) + 40
+	janizzaData.PSum = (math.Float32frombits(SumTemp) * transformerRatio) + 120
 	fmt.Printf("RealPower L1: %v L2: %v L3: %v Sum: %v\n", janizzaData.PL1, janizzaData.PL2, janizzaData.PL3, janizzaData.PSum)
 
 	return nil
