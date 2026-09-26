@@ -162,9 +162,8 @@ func Compute() {
 	fmt.Printf("currentChargePower: %v\n", currentChargePower)
 	fmt.Printf("requiredPower before evcc mode: %v\n", requiredPower)
 
-	// evcc can request normal self-consumption, hold (no discharge), or
-	// charging. Existing SoC and cell-voltage safety limits below remain
-	// authoritative and may reduce/override the requested power.
+	// evcc can request normal self-consumption or hold (no discharge).
+	// Existing SoC and cell-voltage safety limits below remain authoritative.
 	requiredPower = applyEVCCMode(requiredPower)
 	fmt.Printf("requiredPower after evcc mode: %v\n", requiredPower)
 
@@ -226,19 +225,30 @@ func Compute() {
 			for i := range inverters {
 				inverters[i].ChargePower = 0
 			}
-		} else {
-			if solarPowerTotal != 0 {
-				for i := range inverters {
-					proportion := inverters[i].SolarPower / solarPowerTotal
-					chargePower := proportion * (requiredPower)
+		} else if requiredPower == 0 {
+			// A zero request must explicitly clear previous setpoints. Otherwise a
+			// previous negative ChargePower remains active when there is no PV,
+			// which prevents evcc hold mode from stopping battery discharge.
+			for i := range inverters {
+				inverters[i].ChargePower = 0
+			}
+		} else if solarPowerTotal != 0 {
+			for i := range inverters {
+				proportion := inverters[i].SolarPower / solarPowerTotal
+				chargePower := proportion * (requiredPower)
 
-					if chargePower > inverters[i].SolarPower {
-						chargePower = inverters[i].SolarPower
-					}
-
-					inverters[i].ChargePower = chargePower
-					//fmt.Printf("proportion: %v (%v W)\n", proportion, chargePower)
+				if chargePower > inverters[i].SolarPower {
+					chargePower = inverters[i].SolarPower
 				}
+
+				inverters[i].ChargePower = chargePower
+				//fmt.Printf("proportion: %v (%v W)\n", proportion, chargePower)
+			}
+		} else {
+			// No PV is available to realize a positive charging request. Clear
+			// stale values instead of leaving the previous cycle's setpoints active.
+			for i := range inverters {
+				inverters[i].ChargePower = 0
 			}
 		}
 	}
