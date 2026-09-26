@@ -243,6 +243,9 @@ func Compute() {
 		}
 	}
 
+	// Publish a consistent snapshot for the concurrent evcc HTTP handler.
+	updateEVCCStatusSnapshot()
+
 	for _, inverter := range inverters {
 		j, _ := json.Marshal(inverter)
 		fmt.Printf("OVERVIEW: %v\n", string(j))
