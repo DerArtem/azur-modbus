@@ -3,8 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/goburrow/modbus"
 	"time"
+
+	"github.com/goburrow/modbus"
 )
 
 var minVolt float32 = 44 // 43.2V
@@ -17,7 +18,7 @@ func setComParameters(handler *modbus.RTUClientHandler) {
 	handler.StopBits = 2
 	handler.SlaveId = 0x80
 	handler.Timeout = 100 * time.Millisecond
-	handler.RS485.Enabled = true
+	handler.RS485.Enabled = false
 	//handler.Config.RS485.DelayRtsBeforeSend = 200
 	//handler.Config.RS485.DelayRtsAfterSend = 300
 	//handler.Config.RS485.DelayRtsBeforeSend = 100 * time.Millisecond
@@ -34,6 +35,18 @@ func main() {
 	var invReply InverterReply
 	var janizzaData JanizzaData
 
+	janizzaData.UL1 = 230
+	janizzaData.UL2 = 230
+	janizzaData.UL3 = 230
+	janizzaData.PL1 = 0
+	janizzaData.PL2 = 0
+	janizzaData.PL3 = 0
+	janizzaData.PSum = 0
+	janizzaData.QL1 = 0
+	janizzaData.QL2 = 0
+	janizzaData.QL3 = 0
+	janizzaData.QSum = 0
+
 	inverters = []Inverter{
 		{0x80, "Inverter1", 0, 0, 0},
 		{0x81, "Inverter2", 0, 0, 0},
@@ -43,7 +56,8 @@ func main() {
 
 	//comPort := "COM5"
 
-	comPort := "/dev/ttySTM1"
+	//comPort := "/dev/ttySTM1"
+	comPort := "/dev/ttyUSB0"
 	handler := modbus.NewRTUClientHandler(comPort)
 
 	var address uint16
@@ -91,17 +105,17 @@ func main() {
 		err = JanizzaGetRealPower(client, &janizzaData)
 		if err != nil {
 			fmt.Printf("JanizzaGetRealPower error: %v\n", err)
-			continue
+			//continue
 		}
 		err = JanizzaGetApparentPower(client, &janizzaData)
 		if err != nil {
 			fmt.Printf("JanizzaGetApparentPower error: %v\n", err)
-			continue
+			//continue
 		}
 		err = JanizzaGetVoltage(client, &janizzaData)
 		if err != nil {
 			fmt.Printf("JanizzaGetVoltage error: %v\n", err)
-			continue
+			//continue
 		}
 
 		// Get Inverter Data
