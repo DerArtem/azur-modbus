@@ -30,9 +30,9 @@ meters:
       uri: http://azur-controller.local:7070/api/status
       jq: .soc
 
-    # evcc values: 1=normal, 2=hold, 3=charge.
-    # Non-normal commands are refreshed every 30 seconds. azur-modbus itself
-    # falls back to normal if no refresh arrives for 90 seconds.
+    # Supported evcc values: 1=normal, 2=hold.
+    # hold is refreshed every 30 seconds. azur-modbus itself falls back to
+    # normal if no refresh arrives for 90 seconds.
     batterymode:
       source: watchdog
       timeout: 60s
@@ -52,12 +52,6 @@ meters:
               source: http
               method: POST
               uri: http://azur-controller.local:7070/api/mode/hold
-
-          - case: 3 # charge: request grid charging
-            set:
-              source: http
-              method: POST
-              uri: http://azur-controller.local:7070/api/mode/charge
 
 site:
   meters:
