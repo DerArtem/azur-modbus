@@ -160,7 +160,13 @@ func Compute() {
 	requiredPower = -gridConsumption + currentChargePower
 
 	fmt.Printf("currentChargePower: %v\n", currentChargePower)
-	fmt.Printf("requiredPower: %v\n", requiredPower)
+	fmt.Printf("requiredPower before evcc mode: %v\n", requiredPower)
+
+	// evcc can request normal self-consumption, hold (no discharge), or
+	// charging. Existing SoC and cell-voltage safety limits below remain
+	// authoritative and may reduce/override the requested power.
+	requiredPower = applyEVCCMode(requiredPower)
+	fmt.Printf("requiredPower after evcc mode: %v\n", requiredPower)
 
 	if MinCellVolt < 3.1 && MaxCellVolt < 3.2 {
 		ForceChargingByVolt = true
