@@ -160,7 +160,12 @@ func Compute() {
 	requiredPower = -gridConsumption + currentChargePower
 
 	fmt.Printf("currentChargePower: %v\n", currentChargePower)
-	fmt.Printf("requiredPower: %v\n", requiredPower)
+	fmt.Printf("requiredPower before evcc mode: %v\n", requiredPower)
+
+	// evcc can request normal self-consumption or hold (no discharge).
+	// Existing SoC and cell-voltage safety limits below remain authoritative.
+	requiredPower = applyEVCCMode(requiredPower)
+	fmt.Printf("requiredPower after evcc mode: %v\n", requiredPower)
 
 	if MinCellVolt < 3.1 && MaxCellVolt < 3.2 {
 		ForceChargingByVolt = true
@@ -189,7 +194,7 @@ func Compute() {
 	}
 
 	if requiredPower < 0 {
-		fmt.Printf("DISCARGING BATTERY!\n")
+		fmt.Printf("DISCHARGING BATTERY!\n")
 
 		if MinCellVolt < 3.00 {
 			fmt.Printf("Min CellVoltage reached, do not discharge!\n")
@@ -212,30 +217,46 @@ func Compute() {
 				inverters[i].ChargePower = dischargePowerPerInverter
 			}
 		}
-	} else {
-		fmt.Printf("CARGING BATTERY!\n")
+	} else if requiredPower > 0 {
+		fmt.Printf("CHARGING BATTERY FROM PV!\n")
 
 		if batSoC > maxSoC {
 			fmt.Printf("Max SoC reached, do not charge!\n")
 			for i := range inverters {
 				inverters[i].ChargePower = 0
 			}
-		} else {
-			if solarPowerTotal != 0 {
-				for i := range inverters {
-					proportion := inverters[i].SolarPower / solarPowerTotal
-					chargePower := proportion * (requiredPower)
+		} else if solarPowerTotal > 0 {
+			for i := range inverters {
+				proportion := inverters[i].SolarPower / solarPowerTotal
+				chargePower := proportion * requiredPower
 
-					if chargePower > inverters[i].SolarPower {
-						chargePower = inverters[i].SolarPower
-					}
-
-					inverters[i].ChargePower = chargePower
-					//fmt.Printf("proportion: %v (%v W)\n", proportion, chargePower)
+				// The Azur storage can only charge from PV. Never request more
+				// charging power from an inverter than its current PV production.
+				if chargePower > inverters[i].SolarPower {
+					chargePower = inverters[i].SolarPower
 				}
+
+				inverters[i].ChargePower = chargePower
+			}
+		} else {
+			// A positive request cannot be fulfilled without PV. Explicitly clear
+			// old setpoints; the battery must never charge from the grid.
+			fmt.Printf("No PV available, cannot charge battery\n")
+			for i := range inverters {
+				inverters[i].ChargePower = 0
 			}
 		}
+	} else {
+		fmt.Printf("BATTERY IDLE\n")
+		// Zero is an explicit setpoint. Clear any charge/discharge command left
+		// over from the previous controller cycle (for example after evcc hold).
+		for i := range inverters {
+			inverters[i].ChargePower = 0
+		}
 	}
+
+	// Publish a consistent snapshot for the concurrent evcc HTTP handler.
+	updateEVCCStatusSnapshot()
 
 	for _, inverter := range inverters {
 		j, _ := json.Marshal(inverter)

@@ -1,0 +1,62 @@
+# Example evcc configuration for azur-modbus.
+# Replace azur-controller.local with the hostname/IP of the machine running
+# azur-modbus. Add capacity: <kWh> to azur_battery if desired.
+
+meters:
+  - name: azur_grid
+    type: custom
+    power:
+      source: http
+      uri: http://azur-controller.local:7070/api/status
+      jq: .gridPower
+
+  - name: azur_pv
+    type: custom
+    power:
+      source: http
+      uri: http://azur-controller.local:7070/api/status
+      jq: .pvPower
+
+  - name: azur_battery
+    type: custom
+
+    power:
+      source: http
+      uri: http://azur-controller.local:7070/api/status
+      jq: .batteryPower
+
+    soc:
+      source: http
+      uri: http://azur-controller.local:7070/api/status
+      jq: .soc
+
+    # Supported evcc values: 1=normal, 2=hold.
+    # hold is refreshed every 30 seconds. azur-modbus itself falls back to
+    # normal if no refresh arrives for 90 seconds.
+    batterymode:
+      source: watchdog
+      timeout: 60s
+      reset: 1
+      initial: 1
+      set:
+        source: switch
+        switch:
+          - case: 1 # normal
+            set:
+              source: http
+              method: POST
+              uri: http://azur-controller.local:7070/api/mode/normal
+
+          - case: 2 # hold: do not discharge
+            set:
+              source: http
+              method: POST
+              uri: http://azur-controller.local:7070/api/mode/hold
+
+site:
+  meters:
+    grid: azur_grid
+    pv:
+      - azur_pv
+    battery:
+      - azur_battery
