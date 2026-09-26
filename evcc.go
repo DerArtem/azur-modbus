@@ -15,7 +15,6 @@ type EVCCMode string
 const (
 	EVCCModeNormal EVCCMode = "normal"
 	EVCCModeHold   EVCCMode = "hold"
-	EVCCModeCharge EVCCMode = "charge"
 
 	evccWatchdogTimeout = 90 * time.Second
 )
@@ -57,7 +56,6 @@ func init() {
 	mux.HandleFunc("/api/status", handleEVCCStatus)
 	mux.HandleFunc("/api/mode/normal", modeHandler(EVCCModeNormal))
 	mux.HandleFunc("/api/mode/hold", modeHandler(EVCCModeHold))
-	mux.HandleFunc("/api/mode/charge", modeHandler(EVCCModeCharge))
 
 	go func() {
 		log.Printf("evcc HTTP API listening on %s", addr)
@@ -107,15 +105,9 @@ func getEVCCMode() (EVCCMode, time.Time) {
 func applyEVCCMode(requiredPower float32) float32 {
 	mode, _ := getEVCCMode()
 
-	switch mode {
-	case EVCCModeHold:
+	if mode == EVCCModeHold && requiredPower < 0 {
 		// Positive means charging in azur-modbus, negative means discharging.
-		if requiredPower < 0 {
-			return 0
-		}
-	case EVCCModeCharge:
-		// Request maximum charge power. Existing limits reduce this as needed.
-		return 8000
+		return 0
 	}
 
 	return requiredPower
