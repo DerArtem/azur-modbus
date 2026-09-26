@@ -15,8 +15,10 @@ var totalConsumption float32
 var dischargePowerTotal float32 = 0
 
 var batVoltage float32 = 48
-var minSoC float64 = 40
-var maxSoC float64 = 99
+var minSoC float64 = 15
+
+// var maxSoC float64 = 99.99
+var maxSoC float64 = 100
 var batSoC float64 = 0
 
 var maxChargeCurrent float32 = 100
@@ -62,21 +64,47 @@ func calcMaxChargePowerBySoc() (maxChargePowerTotal float32) {
 	if batSoC > 75 {
 		maxChargePowerTotal = 4000
 	}
-	if batSoC > 80 {
+	if batSoC > 85 {
 		maxChargePowerTotal = 3500
 	}
-	if batSoC > 85 {
+	//if batSoC > 85 {
+	//	maxChargePowerTotal = 3000
+	//}
+	if batSoC > 90 {
+		maxChargePowerTotal = 3500
+	}
+	if batSoC > 96 {
 		maxChargePowerTotal = 3000
 	}
-	if batSoC > 90 {
-		maxChargePowerTotal = 2500
+	if batSoC > 98 {
+		maxChargePowerTotal = 2000
 	}
-	if batSoC > 95 {
+	if batSoC > 99 {
 		maxChargePowerTotal = 1500
 	}
 
-	if batSoC > 98 {
+	if MaxCellVolt > 3.55 {
+		maxChargePowerTotal = 1000
+	}
+
+	//if batSoC > 99.9 || MaxCellVolt > 3.60 {
+	//	maxChargePowerTotal = 500
+	//}
+
+	if MaxCellVolt > 3.60 {
 		maxChargePowerTotal = 500
+	}
+
+	if MaxCellVolt > 3.65 {
+		maxChargePowerTotal = 500
+	}
+
+	//if batSoC > 99.98 {
+	//	maxChargePowerTotal = 0
+	//}
+
+	if MaxCellVolt > 3.7 {
+		maxChargePowerTotal = 0
 	}
 
 	return maxChargePowerTotal
@@ -134,7 +162,7 @@ func Compute() {
 	fmt.Printf("currentChargePower: %v\n", currentChargePower)
 	fmt.Printf("requiredPower: %v\n", requiredPower)
 
-	if MinCellVolt < 3.0 && MaxCellVolt < 3.2 {
+	if MinCellVolt < 3.1 && MaxCellVolt < 3.2 {
 		ForceChargingByVolt = true
 	} else {
 		ForceChargingByVolt = false
@@ -163,7 +191,7 @@ func Compute() {
 	if requiredPower < 0 {
 		fmt.Printf("DISCARGING BATTERY!\n")
 
-		if MinCellVolt < 3.10 {
+		if MinCellVolt < 3.00 {
 			fmt.Printf("Min CellVoltage reached, do not discharge!\n")
 			for i := range inverters {
 				inverters[i].ChargePower = 0
